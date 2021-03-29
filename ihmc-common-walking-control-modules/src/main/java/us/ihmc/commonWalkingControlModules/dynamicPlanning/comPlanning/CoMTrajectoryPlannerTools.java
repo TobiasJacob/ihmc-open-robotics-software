@@ -1079,6 +1079,20 @@ public class CoMTrajectoryPlannerTools
                                                          double previousDuration,
                                                          DMatrix constraintMatrixToPack)
    {
+      addCoMVelocityContinuityConstraint(previousSequence, nextSequence, constraintRow, omega, previousDuration, null, constraintMatrixToPack, null, null, null);
+   }
+
+   public static void addCoMVelocityContinuityConstraint(int previousSequence,
+                                                         int nextSequence,
+                                                         int constraintRow,
+                                                         double omega,
+                                                         double previousDuration,
+                                                         FrameVector3DReadOnly changeInVelocity,
+                                                         DMatrix constraintMatrixToPack,
+                                                         DMatrix xConstantsToPack,
+                                                         DMatrix yConstantsToPack,
+                                                         DMatrix zConstantsToPack)
+   {
       // move next sequence coefficients to the left hand side
       int previousStartIndex = 6 * previousSequence;
       int nextStartIndex = 6 * nextSequence;
@@ -1103,6 +1117,13 @@ public class CoMTrajectoryPlannerTools
          constraintMatrixToPack.set(constraintRow, nextStartIndex + 2, -getCoMVelocityThirdCoefficientTimeFunction(0.0));
          constraintMatrixToPack.set(constraintRow, nextStartIndex + 3, -getCoMVelocityFourthCoefficientTimeFunction(0.0));
          constraintMatrixToPack.set(constraintRow, nextStartIndex + 5, -getCoMVelocitySixthCoefficientTimeFunction());
+      }
+
+      if (changeInVelocity != null && xConstantsToPack != null && yConstantsToPack != null && zConstantsToPack != null)
+      {
+         xConstantsToPack.set(constraintRow, 0, -changeInVelocity.getX());
+         yConstantsToPack.set(constraintRow, 0, -changeInVelocity.getY());
+         zConstantsToPack.set(constraintRow, 0, -changeInVelocity.getZ());
       }
    }
 

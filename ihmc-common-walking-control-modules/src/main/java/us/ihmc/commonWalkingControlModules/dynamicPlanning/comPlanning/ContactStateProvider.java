@@ -40,4 +40,14 @@ public interface ContactStateProvider extends TimeIntervalProvider
     * Specifies whether the current state is in contact or not.
     */
    ContactState getContactState();
+
+   default boolean hasChangeInComVelocity()
+   {
+      return false;
+   }
+
+   default FrameVector3DReadOnly getChangeInComVelocity()
+   {
+      return null;
+   }
 }

@@ -10,9 +10,6 @@ import us.ihmc.robotics.time.TimeInterval;
 import us.ihmc.robotics.time.TimeIntervalBasics;
 import us.ihmc.robotics.time.TimeIntervalReadOnly;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * This is the most basic implementation fo a contact state provider for the {@link CoMTrajectoryPlannerInterface}. This is really useful for visualizing
  * what will happen for certain sequences, as it allows the user to directly specify where the start and end ECMP positions are and the contact time intervals.
@@ -26,7 +23,7 @@ public class SettableContactStateProvider implements ContactStateProvider
    private final FrameVector3D endECMPVelocity = new FrameVector3D();
    private final TimeIntervalBasics timeInterval = new TimeInterval();
 
-   private final List<String> bodiesInContact = new ArrayList<>();
+   private final FrameVector3D changeInComVelocity = new FrameVector3D();
 
    public SettableContactStateProvider()
    {
@@ -34,6 +31,7 @@ public class SettableContactStateProvider implements ContactStateProvider
       endECMPPosition.setToNaN();
       startECMPVelocity.setToNaN();
       endECMPVelocity.setToNaN();
+      changeInComVelocity.setToNaN();
    }
 
    public void reset()
@@ -42,7 +40,7 @@ public class SettableContactStateProvider implements ContactStateProvider
       startECMPVelocity.setToNaN();
       endECMPPosition.setToNaN();
       endECMPVelocity.setToNaN();
-      bodiesInContact.clear();
+      changeInComVelocity.setToNaN();
    }
 
    public void set(ContactStateProvider other)
@@ -53,6 +51,7 @@ public class SettableContactStateProvider implements ContactStateProvider
       setEndECMPVelocity(other.getECMPEndVelocity());
       setTimeInterval(other.getTimeInterval());
       setContactState(other.getContactState());
+      setChangeInComVelocity(other.getChangeInComVelocity());
    }
 
    public void setStartECMPPosition(FramePoint3DReadOnly startECMPPosition)
@@ -114,9 +113,9 @@ public class SettableContactStateProvider implements ContactStateProvider
       this.contactState = contactState;
    }
 
-   public void addBodyInContact(String name)
+   public void setChangeInComVelocity(FrameVector3DReadOnly changeInComVelocity)
    {
-      bodiesInContact.add(name);
+      this.changeInComVelocity.setIncludingFrame(changeInComVelocity);
    }
 
    public FramePoint3DReadOnly getECMPStartPosition()
@@ -174,8 +173,16 @@ public class SettableContactStateProvider implements ContactStateProvider
       setStartECMPPosition(previousContactState.getECMPEndPosition());
    }
 
-   public List<String> getBodiesInContact()
+   @Override
+   public boolean hasChangeInComVelocity()
    {
-      return bodiesInContact;
+      return !changeInComVelocity.containsNaN();
    }
+
+   @Override
+   public FrameVector3DReadOnly getChangeInComVelocity()
+   {
+      return changeInComVelocity;
+   }
+
 }

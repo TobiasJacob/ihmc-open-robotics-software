@@ -21,8 +21,6 @@ import us.ihmc.graphicsDescription.appearance.YoAppearance;
 import us.ihmc.graphicsDescription.yoGraphics.BagOfBalls;
 import us.ihmc.graphicsDescription.yoGraphics.YoGraphicsListRegistry;
 import us.ihmc.log.LogTools;
-import us.ihmc.robotics.math.trajectories.generators.MultipleSegmentPositionTrajectoryGenerator;
-import us.ihmc.robotics.math.trajectories.interfaces.Polynomial3DBasics;
 import us.ihmc.robotics.math.trajectories.interfaces.Polynomial3DReadOnly;
 import us.ihmc.yoVariables.euclid.referenceFrame.YoFramePoint3D;
 import us.ihmc.yoVariables.euclid.referenceFrame.YoFrameVector3D;
@@ -680,17 +678,34 @@ public class CoMTrajectoryPlanner implements CoMTrajectoryProvider
     *
     * @param contactSequence current contact sequence.
     * @param previousSequence i-1 in the above equations.
-    * @param nextSequence i in the above equations.
+    * @param nextSequenceId i in the above equations.
     */
-   private void setCoMVelocityContinuity(List<? extends ContactStateProvider> contactSequence, int previousSequence, int nextSequence)
+   private void setCoMVelocityContinuity(List<? extends ContactStateProvider> contactSequence, int previousSequence, int nextSequenceId)
    {
       double previousDuration = contactSequence.get(previousSequence).getTimeInterval().getDuration();
-      CoMTrajectoryPlannerTools.addCoMVelocityContinuityConstraint(previousSequence,
-                                                                   nextSequence,
-                                                                   numberOfConstraints,
-                                                                   omega.getValue(),
-                                                                   previousDuration,
-                                                                   coefficientMultipliersSparse);
+      ContactStateProvider nextSequence = contactSequence.get(nextSequenceId);
+      if (nextSequence.hasChangeInComVelocity())
+      {
+         CoMTrajectoryPlannerTools.addCoMVelocityContinuityConstraint(previousSequence,
+                                                                      nextSequenceId,
+                                                                      numberOfConstraints,
+                                                                      omega.getValue(),
+                                                                      previousDuration,
+                                                                      coefficientMultipliersSparse);
+      }
+      else
+      {
+         CoMTrajectoryPlannerTools.addCoMVelocityContinuityConstraint(previousSequence,
+                                                                      nextSequenceId,
+                                                                      numberOfConstraints,
+                                                                      omega.getValue(),
+                                                                      previousDuration,
+                                                                      nextSequence.getChangeInComVelocity(),
+                                                                      coefficientMultipliersSparse,
+                                                                      xConstants,
+                                                                      yConstants,
+                                                                      zConstants);
+      }
       numberOfConstraints++;
    }
 
