@@ -691,7 +691,11 @@ public class CoMTrajectoryPlanner implements CoMTrajectoryProvider
                                                                       numberOfConstraints,
                                                                       omega.getValue(),
                                                                       previousDuration,
-                                                                      coefficientMultipliersSparse);
+                                                                      nextSequence.getChangeInComVelocity(),
+                                                                      coefficientMultipliersSparse,
+                                                                      xConstants,
+                                                                      yConstants,
+                                                                      zConstants);
       }
       else
       {
@@ -700,11 +704,7 @@ public class CoMTrajectoryPlanner implements CoMTrajectoryProvider
                                                                       numberOfConstraints,
                                                                       omega.getValue(),
                                                                       previousDuration,
-                                                                      nextSequence.getChangeInComVelocity(),
-                                                                      coefficientMultipliersSparse,
-                                                                      xConstants,
-                                                                      yConstants,
-                                                                      zConstants);
+                                                                      coefficientMultipliersSparse);
       }
       numberOfConstraints++;
    }
