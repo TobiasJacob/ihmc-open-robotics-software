@@ -21,6 +21,21 @@ public class VRPTrajectorySubspaceSolver
 
    private final LinearSolverDense<DMatrixRMaj> solver = LinearSolverFactory_DDRM.general(4, 4);
 
+   public DMatrixRMaj getXCoefficients(int segment)
+   {
+      return xCoefficients.get(segment);
+   }
+
+   public DMatrixRMaj getYCoefficients(int segment)
+   {
+      return yCoefficients.get(segment);
+   }
+
+   public DMatrixRMaj getZCoefficients(int segment)
+   {
+      return zCoefficients.get(segment);
+   }
+
    public void solveForCoefficientSubspaceCoefficients(List<FramePoint3DReadOnly> startVRPPositions,
                                                        List<FramePoint3DReadOnly> endVRPPositions,
                                                        List<? extends ContactStateProvider> contactSequence,
@@ -39,6 +54,18 @@ public class VRPTrajectorySubspaceSolver
                                                         ContactStateProvider contact,
                                                         double omega)
    {
+      DMatrixRMaj xCoefficientVector = xCoefficients.add();
+      DMatrixRMaj yCoefficientVector = yCoefficients.add();
+      DMatrixRMaj zCoefficientVector = zCoefficients.add();
+
+      if (!contact.getContactState().isLoadBearing())
+      {
+         xCoefficientVector.zero();
+         yCoefficientVector.zero();
+         zCoefficientVector.zero();
+         return;
+      }
+
       computeVRPConstraintMatrix(omega, contact.getTimeInterval().getDuration());
 
       vrpBoundsVector.set(0, 0, startVRPPosition.getX());
@@ -46,21 +73,21 @@ public class VRPTrajectorySubspaceSolver
       vrpBoundsVector.set(0, 0, endVRPPosition.getX());
       vrpBoundsVector.set(0, 0, contact.getECMPEndVelocity().getX());
 
-      CommonOps_DDRM.mult(vrpConstraintMatrixInverse, vrpBoundsVector, xCoefficients.add());
+      CommonOps_DDRM.mult(vrpConstraintMatrixInverse, vrpBoundsVector, xCoefficientVector);
 
       vrpBoundsVector.set(0, 0, startVRPPosition.getY());
       vrpBoundsVector.set(0, 0, contact.getECMPStartVelocity().getY());
       vrpBoundsVector.set(0, 0, endVRPPosition.getY());
       vrpBoundsVector.set(0, 0, contact.getECMPEndVelocity().getY());
 
-      CommonOps_DDRM.mult(vrpConstraintMatrixInverse, vrpBoundsVector, yCoefficients.add());
+      CommonOps_DDRM.mult(vrpConstraintMatrixInverse, vrpBoundsVector, yCoefficientVector);
 
       vrpBoundsVector.set(0, 0, startVRPPosition.getZ());
       vrpBoundsVector.set(0, 0, contact.getECMPStartVelocity().getZ());
       vrpBoundsVector.set(0, 0, endVRPPosition.getZ());
       vrpBoundsVector.set(0, 0, contact.getECMPEndVelocity().getZ());
 
-      CommonOps_DDRM.mult(vrpConstraintMatrixInverse, vrpBoundsVector, zCoefficients.add());
+      CommonOps_DDRM.mult(vrpConstraintMatrixInverse, vrpBoundsVector, zCoefficientVector);
    }
 
    private void computeVRPConstraintMatrix(double omega, double duration)
