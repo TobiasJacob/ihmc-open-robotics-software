@@ -8,6 +8,7 @@ import us.ihmc.commonWalkingControlModules.modelPredictiveController.ioHandling.
 import us.ihmc.commonWalkingControlModules.modelPredictiveController.ContactPlaneProvider;
 import us.ihmc.commonWalkingControlModules.controllerCore.command.ConstraintType;
 import us.ihmc.commonWalkingControlModules.modelPredictiveController.commands.*;
+import us.ihmc.commonWalkingControlModules.momentumBasedController.optimization.NativeQPInputTypeA;
 import us.ihmc.commonWalkingControlModules.momentumBasedController.optimization.QPInputTypeA;
 import us.ihmc.commonWalkingControlModules.wrenchDistribution.ZeroConeRotationCalculator;
 import us.ihmc.euclid.geometry.interfaces.ConvexPolygon2DReadOnly;
@@ -17,6 +18,7 @@ import us.ihmc.euclid.referenceFrame.FrameVector3D;
 import us.ihmc.euclid.referenceFrame.ReferenceFrame;
 import us.ihmc.euclid.referenceFrame.tools.EuclidFrameRandomTools;
 import us.ihmc.matrixlib.MatrixTools;
+import us.ihmc.matrixlib.NativeMatrix;
 import us.ihmc.yoVariables.registry.YoRegistry;
 
 import java.util.ArrayList;
@@ -58,8 +60,8 @@ public class MPCQPInputCalculatorTest
       int rhoSize = 16;
       int rhoCoefficients = 4 * rhoSize;
       int comCoefficients = 6;
-      QPInputTypeA comPositionQPInput = new QPInputTypeA(rhoCoefficients + comCoefficients);
-      QPInputTypeA comVelocityQPInput = new QPInputTypeA(rhoCoefficients + comCoefficients);
+      NativeQPInputTypeA comPositionQPInput = new NativeQPInputTypeA(rhoCoefficients + comCoefficients);
+      NativeQPInputTypeA comVelocityQPInput = new NativeQPInputTypeA(rhoCoefficients + comCoefficients);
 
       Random random = new Random(1738L);
 
@@ -171,8 +173,8 @@ public class MPCQPInputCalculatorTest
       indexHandler.initialize(i -> contactPolygon.getNumberOfVertices(), 2);
 
       int rhoSize = 16;
-      QPInputTypeA comPositionQPInput = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA comVelocityQPInput = new QPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA comPositionQPInput = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA comVelocityQPInput = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
 
       Random random = new Random(1738L);
 
@@ -185,8 +187,8 @@ public class MPCQPInputCalculatorTest
 
          contactPlaneHelper.computeBasisVectors(contactPolygon, contactPose, mu);
 
-         DMatrixRMaj rhoMagnitudesJacobian = MPCTestHelper.getCoMPositionJacobian(time, omega, rhoHelper);
-         DMatrixRMaj rhoRatesJacobian = MPCTestHelper.getCoMVelocityJacobian(time, omega, rhoHelper);
+         NativeMatrix rhoMagnitudesJacobian = MPCTestHelper.getCoMPositionJacobian(time, omega, rhoHelper);
+         NativeMatrix rhoRatesJacobian = MPCTestHelper.getCoMVelocityJacobian(time, omega, rhoHelper);
 
          DMatrixRMaj comPositionJacobian = new DMatrixRMaj(3, indexHandler.getTotalProblemSize());
          DMatrixRMaj comVelocityJacobian = new DMatrixRMaj(3, indexHandler.getTotalProblemSize());
@@ -268,8 +270,8 @@ public class MPCQPInputCalculatorTest
       int rhoSize = 16;
       int rhoCoefficients = 4 * rhoSize;
       int comCoefficients = 6;
-      QPInputTypeA dcmPositionQPInput = new QPInputTypeA(rhoCoefficients + comCoefficients);
-      QPInputTypeA dcmVelocityQPInput = new QPInputTypeA(rhoCoefficients + comCoefficients);
+      NativeQPInputTypeA dcmPositionQPInput = new NativeQPInputTypeA(rhoCoefficients + comCoefficients);
+      NativeQPInputTypeA dcmVelocityQPInput = new NativeQPInputTypeA(rhoCoefficients + comCoefficients);
 
       Random random = new Random(1738L);
 
@@ -398,8 +400,8 @@ public class MPCQPInputCalculatorTest
       int rhoSize = 16;
       int rhoCoefficients = 4 * rhoSize;
       int comCoefficients = 6;
-      QPInputTypeA vrpPositionQPInput = new QPInputTypeA(rhoCoefficients + comCoefficients);
-      QPInputTypeA vrpVelocityQPInput = new QPInputTypeA(rhoCoefficients + comCoefficients);
+      NativeQPInputTypeA vrpPositionQPInput = new NativeQPInputTypeA(rhoCoefficients + comCoefficients);
+      NativeQPInputTypeA vrpVelocityQPInput = new NativeQPInputTypeA(rhoCoefficients + comCoefficients);
 
       Random random = new Random(1738L);
 
@@ -521,10 +523,10 @@ public class MPCQPInputCalculatorTest
 
       indexHandler.initialize(i -> contactPolygon.getNumberOfVertices(), 2);
 
-      QPInputTypeA comPositionQPInput = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA comVelocityQPInput = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA comPositionQPInputCompact = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA comVelocityQPInputCompact = new QPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA comPositionQPInput = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA comVelocityQPInput = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA comPositionQPInputCompact = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA comVelocityQPInputCompact = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
 
       Random random = new Random(1738L);
 
@@ -607,10 +609,10 @@ public class MPCQPInputCalculatorTest
 
       indexHandler.initialize(i -> contactPolygon.getNumberOfVertices(), 2);
 
-      QPInputTypeA dcmPositionQPInput = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA dcmVelocityQPInput = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA dcmPositionQPInputCompact = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA dcmVelocityQPInputCompact = new QPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA dcmPositionQPInput = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA dcmVelocityQPInput = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA dcmPositionQPInputCompact = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA dcmVelocityQPInputCompact = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
 
       Random random = new Random(1738L);
 
@@ -692,10 +694,10 @@ public class MPCQPInputCalculatorTest
 
       indexHandler.initialize(i -> contactPolygon.getNumberOfVertices(), 2);
 
-      QPInputTypeA vrpPositionQPInput = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA vrpVelocityQPInput = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA vrpPositionQPInputCompact = new QPInputTypeA(indexHandler.getTotalProblemSize());
-      QPInputTypeA vrpVelocityQPInputCompact = new QPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA vrpPositionQPInput = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA vrpVelocityQPInput = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA vrpPositionQPInputCompact = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
+      NativeQPInputTypeA vrpVelocityQPInputCompact = new NativeQPInputTypeA(indexHandler.getTotalProblemSize());
 
       Random random = new Random(1738L);
 
