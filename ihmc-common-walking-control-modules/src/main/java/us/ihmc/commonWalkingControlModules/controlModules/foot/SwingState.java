@@ -65,6 +65,8 @@ public class SwingState extends AbstractFootControlState
    private static final double minScalingFactor = 0.1;
    private static final double exponentialScalingRate = 5.0;
 
+   private static final double fractionThroughSwingForPickUp = 0.25;
+
    private final SwingTrajectoryCalculator swingTrajectoryCalculator;
    private final MultipleWaypointsBlendedPoseTrajectoryGenerator blendedSwingTrajectory;
    private final BlendedPositionTrajectoryGeneratorVisualizer swingVisualizer;
@@ -349,6 +351,9 @@ public class SwingState extends AbstractFootControlState
 
       if (workspaceLimiterControlModule != null)
       {
+         if (timeInState < swingDuration.getDoubleValue() * fractionThroughSwingForPickUp)
+            workspaceLimiterControlModule.setCheckVelocityForSwingSingularityAvoidance(true);
+
          desiredPose.setIncludingFrame(desiredPosition, desiredOrientation);
          changeDesiredPoseBodyFrame(controlFrame, ankleFrame, desiredPose);
          desiredAnklePosition.setIncludingFrame(desiredPose.getPosition());
