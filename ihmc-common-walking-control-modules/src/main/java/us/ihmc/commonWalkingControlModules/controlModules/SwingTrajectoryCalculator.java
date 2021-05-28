@@ -17,6 +17,7 @@ import us.ihmc.euclid.referenceFrame.FrameVector3D;
 import us.ihmc.euclid.referenceFrame.ReferenceFrame;
 import us.ihmc.euclid.referenceFrame.interfaces.FramePoint3DReadOnly;
 import us.ihmc.euclid.referenceFrame.interfaces.FrameVector3DReadOnly;
+import us.ihmc.graphicsDescription.yoGraphics.YoGraphicsListRegistry;
 import us.ihmc.humanoidRobotics.footstep.Footstep;
 import us.ihmc.log.LogTools;
 import us.ihmc.mecano.frames.MovingReferenceFrame;
@@ -84,15 +85,39 @@ public class SwingTrajectoryCalculator
                                     WalkingControllerParameters walkingControllerParameters, YoSwingTrajectoryParameters swingTrajectoryParameters,
                                     YoRegistry parentRegistry)
    {
-      this.swingTrajectoryParameters = swingTrajectoryParameters;
-      double maxSwingHeightFromStanceFoot = walkingControllerParameters.getSteppingParameters().getMaxSwingHeightFromStanceFoot();
-      double minSwingHeightFromStanceFoot = walkingControllerParameters.getSteppingParameters().getMinSwingHeightFromStanceFoot();
-      double defaultSwingHeightFromStanceFoot = walkingControllerParameters.getSteppingParameters().getDefaultSwingHeightFromStanceFoot();
-      double customWaypointAngleThreshold = walkingControllerParameters.getSteppingParameters().getCustomWaypointAngleThreshold();
+      this(namePrefix,
+           robotSide,
+           controllerToolbox.getReferenceFrames().getSoleFrame(robotSide),
+           controllerToolbox.getReferenceFrames().getSoleFrame(robotSide.getOppositeSide()),
+           controllerToolbox.getReferenceFrames().getSoleZUpFrame(robotSide.getOppositeSide()),
+           walkingControllerParameters.getSteppingParameters().getMaxSwingHeightFromStanceFoot(),
+           walkingControllerParameters.getSteppingParameters().getMinSwingHeightFromStanceFoot(),
+           walkingControllerParameters.getSteppingParameters().getDefaultSwingHeightFromStanceFoot(),
+           walkingControllerParameters.getSteppingParameters().getCustomWaypointAngleThreshold(),
+           walkingControllerParameters.getMinSwingTrajectoryClearanceFromStanceFoot(),
+           swingTrajectoryParameters,
+           parentRegistry,
+           controllerToolbox.getYoGraphicsListRegistry());
+   }
 
-      soleFrame = controllerToolbox.getReferenceFrames().getSoleFrame(robotSide);
-      oppositeSoleFrame = controllerToolbox.getReferenceFrames().getSoleFrame(robotSide.getOppositeSide());
-      oppositeSoleZUpFrame = controllerToolbox.getReferenceFrames().getSoleZUpFrame(robotSide.getOppositeSide());
+   public SwingTrajectoryCalculator(String namePrefix, RobotSide robotSide,
+                                    MovingReferenceFrame soleFrame,
+                                    ReferenceFrame oppositeSoleFrame,
+                                    ReferenceFrame oppositeSoleZUpFrame,
+                                    double maxSwingHeightFromStanceFoot,
+                                    double minSwingHeightFromStanceFoot,
+                                    double defaultSwingHeightFromStanceFoot,
+                                    double customWaypointAngleThreshold,
+                                    double minSwingTrajectoryClearanceFromStanceFoot,
+                                    YoSwingTrajectoryParameters swingTrajectoryParameters,
+                                    YoRegistry parentRegistry,
+                                    YoGraphicsListRegistry graphicsListRegistry)
+   {
+      this.swingTrajectoryParameters = swingTrajectoryParameters;
+
+      this.soleFrame = soleFrame;
+      this.oppositeSoleFrame = oppositeSoleFrame;
+      this.oppositeSoleZUpFrame = oppositeSoleZUpFrame;
       currentStateProvider = new CurrentRigidBodyStateProvider(soleFrame);
 
       namePrefix += "FootSwing";
@@ -112,9 +137,8 @@ public class SwingTrajectoryCalculator
                                                                defaultSwingHeightFromStanceFoot,
                                                                customWaypointAngleThreshold,
                                                                registry,
-                                                               controllerToolbox.getYoGraphicsListRegistry());
-      double minDistanceToStance = walkingControllerParameters.getMinSwingTrajectoryClearanceFromStanceFoot();
-      swingTrajectoryOptimizer.enableStanceCollisionAvoidance(robotSide, oppositeSoleZUpFrame, minDistanceToStance);
+                                                               graphicsListRegistry);
+      swingTrajectoryOptimizer.enableStanceCollisionAvoidance(robotSide, oppositeSoleZUpFrame, minSwingTrajectoryClearanceFromStanceFoot);
 
       lastFootstepPosition.setToNaN();
       finalPosition.setToNaN();

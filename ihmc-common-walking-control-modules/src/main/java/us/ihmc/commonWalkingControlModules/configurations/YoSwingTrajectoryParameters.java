@@ -56,6 +56,20 @@ public class YoSwingTrajectoryParameters
    public YoSwingTrajectoryParameters(String namePrefix, WalkingControllerParameters walkingControllerParameters, SwingTrajectoryParameters parameters,
                                       YoRegistry registry)
    {
+      this(namePrefix,
+           parameters,
+           walkingControllerParameters.ignoreSwingInitialAngularVelocityZ(),
+           walkingControllerParameters.getMaxSwingInitialLinearVelocityMagnitude(),
+           walkingControllerParameters.getMaxSwingInitialAngularVelocityMagnitude(),
+           registry);
+   }
+   public YoSwingTrajectoryParameters(String namePrefix,
+                                      SwingTrajectoryParameters parameters,
+                                      boolean ignoreSwingInitialAngularVelocityZ,
+                                      double maxSwingInitialLinearVelocityMagnitude,
+                                      double maxSwingInitialAngularVelocityMagnitude,
+                                      YoRegistry registry)
+   {
       doHeelTouchdownIfPossible = new BooleanParameter(namePrefix + "DoHeelTouchdownIfPossible", registry, parameters.doHeelTouchdownIfPossible());
       heelTouchdownAngle = new DoubleParameter(namePrefix + "HeelTouchdownAngle", registry, parameters.getHeelTouchdownAngle());
       maximumHeightForHeelTouchdown = new DoubleParameter(namePrefix + "MaximumHeightForHeelTouchdown",
@@ -116,13 +130,13 @@ public class YoSwingTrajectoryParameters
 
       ignoreInitialAngularVelocityZ = new BooleanParameter(namePrefix + "IgnoreInitialAngularVelocityZ",
                                                            registry,
-                                                           walkingControllerParameters.ignoreSwingInitialAngularVelocityZ());
+                                                           ignoreSwingInitialAngularVelocityZ);
       maxInitialLinearVelocityMagnitude = new DoubleParameter(namePrefix + "MaxInitialLinearVelocityMagnitude",
                                                               registry,
-                                                              walkingControllerParameters.getMaxSwingInitialLinearVelocityMagnitude());
+                                                              maxSwingInitialLinearVelocityMagnitude);
       maxInitialAngularVelocityMagnitude = new DoubleParameter(namePrefix + "MaxInitialAngularVelocityMagnitude",
                                                                registry,
-                                                               walkingControllerParameters.getMaxSwingInitialAngularVelocityMagnitude());
+                                                               maxSwingInitialAngularVelocityMagnitude);
 
       velocityAdjustmentDamping = new DoubleParameter(namePrefix + "VelocityAdjustmentDamping", registry, parameters.getSwingFootVelocityAdjustmentDamping());
    }
