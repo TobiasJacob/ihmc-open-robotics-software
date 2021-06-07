@@ -7,17 +7,20 @@ import us.ihmc.avatar.ros.RobotROSClockCalculator;
 import us.ihmc.commons.Conversions;
 import us.ihmc.communication.IHMCROS2Callback;
 import us.ihmc.communication.ROS2Tools;
+import us.ihmc.log.LogTools;
 import us.ihmc.robotModels.FullHumanoidRobotModel;
 import us.ihmc.ros2.ROS2NodeInterface;
 import us.ihmc.sensorProcessing.communication.producers.RobotConfigurationDataBuffer;
+import us.ihmc.utilities.ros.RosNodeInterface;
 
 public class DelayedRobotConfigurationDataBuffer
 {
-   public static final double INITIAL_DELAY_OFFSET = 0.07; // TODO: Put in a stored property set
+   public static final double INITIAL_DELAY_OFFSET = 0.07;
 
    private final MutableDouble delayOffset = new MutableDouble(INITIAL_DELAY_OFFSET);
 
-   private double selectedTimestamp = 0.0;
+   private long selectedTimestamp = -1L;
+   private long currentTimestampOffset = -1L;
 
    private boolean enabled = false;
    private final RobotROSClockCalculator rosClockCalculator;
@@ -48,6 +51,11 @@ public class DelayedRobotConfigurationDataBuffer
       robotConfigurationDataBuffer.update(robotConfigurationData);
    }
 
+   public void setDelayOffset(double delayOffset)
+   {
+      this.delayOffset.setValue(delayOffset);
+   }
+
    public void setEnabled(boolean enabled)
    {
       if (this.enabled != enabled)
@@ -68,42 +76,68 @@ public class DelayedRobotConfigurationDataBuffer
       this.enabled = enabled;
    }
 
-   public double updateFullRobotModel(long timestamp, FullHumanoidRobotModel fullRobotModelToUpdate)
+
+   public void subscribe(RosNodeInterface ros1Node)
+   {
+      rosClockCalculator.subscribeToROS1Topics(ros1Node);
+   }
+
+   public void unsubscribe(RosNodeInterface ros1Node)
+   {
+      rosClockCalculator.unsubscribeFromROS1Topics(ros1Node);
+   }
+
+   public long updateFullRobotModel(long timestamp, FullHumanoidRobotModel fullRobotModelToUpdate)
    {
       if (enabled)
       {
-
          double seconds = delayOffset.getValue();
          //      LogTools.info("Latest delay: {}", seconds);
          long offsetTimestamp = timestamp - Conversions.secondsToNanoseconds(seconds);
 
          if (!rosClockCalculator.offsetIsDetermined())
          {
-            selectedTimestamp = Double.NaN;
+            selectedTimestamp = -1L;
+            currentTimestampOffset = -1L;
             return selectedTimestamp;
          }
 
          long controllerTime = rosClockCalculator.computeRobotMonotonicTime(offsetTimestamp);
          if (controllerTime == -1L)
          {
-            selectedTimestamp = Double.NaN;
+            selectedTimestamp = -1L;
+            currentTimestampOffset = -1L;
             return selectedTimestamp;
          }
 
          long newestTimestamp = robotConfigurationDataBuffer.getNewestTimestamp();
          if (newestTimestamp == -1L)
          {
-            selectedTimestamp = Double.NaN;
+            selectedTimestamp = -1L;
+            currentTimestampOffset = -1L;
             return selectedTimestamp;
          }
 
          selectedTimestamp = robotConfigurationDataBuffer.updateFullRobotModel(false, controllerTime, fullRobotModelToUpdate, null);
+         if (selectedTimestamp != -1L)
+            currentTimestampOffset = rosClockCalculator.getCurrentTimestampOffset();
       }
       else
       {
-         selectedTimestamp = Double.NaN;
+         selectedTimestamp = -1L;
+         currentTimestampOffset = -1L;
       }
 
       return selectedTimestamp;
+   }
+
+   public long getSelectedTimestamp()
+   {
+      return selectedTimestamp;
+   }
+
+   public long getCurrentTimestampOffset()
+   {
+      return currentTimestampOffset;
    }
 }
