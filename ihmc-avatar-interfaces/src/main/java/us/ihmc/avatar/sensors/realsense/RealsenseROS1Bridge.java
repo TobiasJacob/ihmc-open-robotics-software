@@ -14,13 +14,13 @@ import java.net.URI;
 
 public class RealsenseROS1Bridge
 {
-   private final DelayedReferenceFramesBuffer delayedRobotConfigurationDataBuffer;
+   private final DelayedReferenceFramesBuffer referenceFrameBuffer;
 
    private final RealsenseVideoROS1Bridge d435VideoBridge;
    private final RealsenseVideoROS1Bridge l515VideoBridge;
    private final RealsensePointCloudROS1Bridge d435PointCloudBridge;
    private final RealsensePointCloudROS1Bridge l515PointCloudBridge;
-   private final MapSensePlanarRegionROS1Bridge l515PlanarRegionBridge;
+   //   private final MapSensePlanarRegionROS1Bridge l515PlanarRegionBridge;
 
    public RealsenseROS1Bridge(DRCRobotModel robotModel)
    {
@@ -30,28 +30,38 @@ public class RealsenseROS1Bridge
 
       ROS2Node ros2Node = ROS2Tools.createROS2Node(PubSubImplementation.FAST_RTPS, "imagePublisherNode");
 
-      delayedRobotConfigurationDataBuffer = new DelayedReferenceFramesBuffer(ros2Node, robotModel);
-      delayedRobotConfigurationDataBuffer.subscribe(ros1Node);
-      delayedRobotConfigurationDataBuffer.setEnabled(true);
+      referenceFrameBuffer = new DelayedReferenceFramesBuffer(ros2Node, robotModel);
+      referenceFrameBuffer.subscribe(ros1Node);
+      referenceFrameBuffer.setEnabled(true);
 
-      d435VideoBridge = new RealsenseVideoROS1Bridge(ros1Node, ros2Node, RosTools.D435_VIDEO, ROS2Tools.D435_VIDEO,
-                                                     delayedRobotConfigurationDataBuffer, HumanoidReferenceFrames::getObjectDetectionCameraFrame);
-      l515VideoBridge = new RealsenseVideoROS1Bridge(ros1Node, ros2Node, RosTools.L515_VIDEO, ROS2Tools.L515_VIDEO,
-                                                     delayedRobotConfigurationDataBuffer, HumanoidReferenceFrames::getSteppingCameraFrame);
+      d435VideoBridge = new RealsenseVideoROS1Bridge(ros1Node,
+                                                     ros2Node,
+                                                     RosTools.D435_VIDEO,
+                                                     ROS2Tools.D435_VIDEO,
+                                                     referenceFrameBuffer,
+                                                     HumanoidReferenceFrames::getObjectDetectionCameraFrame);
+      l515VideoBridge = new RealsenseVideoROS1Bridge(ros1Node,
+                                                     ros2Node,
+                                                     RosTools.L515_VIDEO,
+                                                     ROS2Tools.L515_VIDEO,
+                                                     referenceFrameBuffer,
+                                                     HumanoidReferenceFrames::getSteppingCameraFrame);
 
-      d435PointCloudBridge = new RealsensePointCloudROS1Bridge(robotModel,
-                                                               ros1Node,
+      d435PointCloudBridge = new RealsensePointCloudROS1Bridge(ros1Node,
                                                                ros2Node,
                                                                RosTools.D435_POINT_CLOUD,
-                                                               ROS2Tools.D435_POINT_CLOUD);
-      l515PointCloudBridge = new RealsensePointCloudROS1Bridge(robotModel,
-                                                               ros1Node,
+                                                               ROS2Tools.D435_POINT_CLOUD,
+                                                               referenceFrameBuffer,
+                                                               HumanoidReferenceFrames::getObjectDetectionCameraFrame);
+      l515PointCloudBridge = new RealsensePointCloudROS1Bridge(ros1Node,
                                                                ros2Node,
                                                                RosTools.L515_POINT_CLOUD,
-                                                               ROS2Tools.L515_POINT_CLOUD);
-      l515PlanarRegionBridge = new MapSensePlanarRegionROS1Bridge(robotModel,
-                                                                  ros1Node,
-                                                                  ros2Node);
+                                                               ROS2Tools.L515_POINT_CLOUD,
+                                                               referenceFrameBuffer,
+                                                               HumanoidReferenceFrames::getSteppingCameraFrame);
+      //      l515PlanarRegionBridge = new MapSensePlanarRegionROS1Bridge(robotModel,
+      //                                                                  ros1Node,
+      //                                                                  ros2Node);
 
       ros1Node.execute();
    }

@@ -53,12 +53,6 @@ public class DelayedReferenceFramesBuffer
       referenceFrames = new HumanoidReferenceFrames(fullRobotModel, robotModel.getSensorInformation());
    }
 
-   private void acceptRobotConfigurationData(RobotConfigurationData robotConfigurationData)
-   {
-      // LogTools.info("Recieved robot configuration data w/ timestamp: {}", data.getMonotonicTime());
-      robotConfigurationDataBuffer.update(robotConfigurationData);
-   }
-
    public void setDelayOffset(double delayOffset)
    {
       this.delayOffset.setValue(delayOffset);
@@ -72,7 +66,7 @@ public class DelayedReferenceFramesBuffer
          {
             robotConfigurationDataSubscriber = ROS2Tools.createCallbackSubscription2(ros2Node,
                                                                                      ROS2Tools.getRobotConfigurationDataTopic(robotModel.getSimpleRobotName()),
-                                                                                     this::acceptRobotConfigurationData);
+                                                                                     robotConfigurationDataBuffer::update);
          }
          else
          {

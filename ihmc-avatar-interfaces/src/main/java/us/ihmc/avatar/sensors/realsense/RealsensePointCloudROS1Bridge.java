@@ -9,6 +9,7 @@ import us.ihmc.communication.ROS2Tools;
 import us.ihmc.euclid.referenceFrame.FramePose3D;
 import us.ihmc.euclid.referenceFrame.ReferenceFrame;
 import us.ihmc.euclid.tuple3D.Point3D;
+import us.ihmc.humanoidRobotics.frames.HumanoidReferenceFrames;
 import us.ihmc.log.LogTools;
 import us.ihmc.robotEnvironmentAwareness.communication.converters.PointCloudMessageTools;
 import us.ihmc.ros2.ROS2Node;
@@ -19,9 +20,11 @@ import us.ihmc.tools.UnitConversions;
 import us.ihmc.tools.thread.MissingThreadTools;
 import us.ihmc.tools.thread.ResettableExceptionHandlingExecutorService;
 import us.ihmc.utilities.ros.RosMainNode;
+import us.ihmc.utilities.ros.RosNodeInterface;
 import us.ihmc.utilities.ros.subscriber.AbstractRosTopicSubscriber;
 
 import java.util.ArrayList;
+import java.util.function.Function;
 
 public class RealsensePointCloudROS1Bridge extends AbstractRosTopicSubscriber<sensor_msgs.PointCloud2>
 {
@@ -29,20 +32,28 @@ public class RealsensePointCloudROS1Bridge extends AbstractRosTopicSubscriber<se
    private static final double MIN_PUBLISH_PERIOD = UnitConversions.hertzToSeconds(10.0);
 
    private final IHMCROS2Publisher<StereoVisionPointCloudMessage> publisher;
-   private final RemoteSyncedRobotModel syncedRobot;
    private final FramePose3D tempSensorFramePose = new FramePose3D();
    private final Timer throttleTimer = new Timer();
    private final ResettableExceptionHandlingExecutorService executor = MissingThreadTools.newSingleThreadExecutor(getClass().getSimpleName(), true, 1);
 
-   public RealsensePointCloudROS1Bridge(DRCRobotModel robotModel,
-                                        RosMainNode ros1Node,
+   private final DelayedReferenceFramesBuffer referenceFramesBuffer;
+   private final Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider;
+
+   private final RosNodeInterface ros1Node;
+
+
+   public RealsensePointCloudROS1Bridge(RosMainNode ros1Node,
                                         ROS2Node ros2Node,
                                         String ros1InputTopic,
-                                        ROS2Topic<StereoVisionPointCloudMessage> ros2OutputTopic)
+                                        ROS2Topic<StereoVisionPointCloudMessage> ros2OutputTopic,
+                                        DelayedReferenceFramesBuffer referenceFramesBuffer,
+                                        Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider)
    {
       super(sensor_msgs.PointCloud2._TYPE);
 
-      syncedRobot = new RemoteSyncedRobotModel(robotModel, ros2Node);
+      this.ros1Node = ros1Node;
+      this.sensorFrameProvider = sensorFrameProvider;
+      this.referenceFramesBuffer = referenceFramesBuffer;
 
       LogTools.info("Subscribing ROS 1: {}", ros1InputTopic);
       ros1Node.attachSubscriber(ros1InputTopic, this);
@@ -74,8 +85,11 @@ public class RealsensePointCloudROS1Bridge extends AbstractRosTopicSubscriber<se
 
          pointCloudData.flipToZUp();
 
-         syncedRobot.update();
-         pointCloudData.applyTransform(syncedRobot.getReferenceFrames().getSteppingCameraFrame().getTransformToWorldFrame());
+
+         long timestamp = ros1PointCloud.getHeader().getStamp().totalNsecs();
+         referenceFramesBuffer.computeReferenceFrames(timestamp);
+         ReferenceFrame sensorFrame = sensorFrameProvider.apply(referenceFramesBuffer.getReferenceFrames());
+         pointCloudData.applyTransform(sensorFrame.getTransformToWorldFrame());
 
          ArrayList<Point3D> pointCloud = new ArrayList<>();
          for (int i = 0; i < pointCloudData.getNumberOfPoints(); i++)
@@ -83,7 +97,7 @@ public class RealsensePointCloudROS1Bridge extends AbstractRosTopicSubscriber<se
             pointCloud.add(new Point3D(pointCloudData.getPointCloud()[i]));
          }
 
-         tempSensorFramePose.setToZero(syncedRobot.getReferenceFrames().getSteppingCameraFrame());
+         tempSensorFramePose.setToZero(sensorFrame);
          tempSensorFramePose.changeFrame(ReferenceFrame.getWorldFrame());
          StereoVisionPointCloudMessage message = PointCloudMessageTools.toStereoVisionPointCloudMessage(pointCloud, tempSensorFramePose);
 //         LogTools.info("Publishing point cloud of size {}", message.getNumberOfPoints());

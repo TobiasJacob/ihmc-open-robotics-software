@@ -41,7 +41,7 @@ public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_
    private final DelayedReferenceFramesBuffer referenceFramesBuffer;
    private final Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider;
 
-   private RosNodeInterface ros1Node;
+   private final RosNodeInterface ros1Node;
 
    public RealsenseVideoROS1Bridge(RosNodeInterface ros1Node, ROS2Node ros2Node, String ros1InputTopic, ROS2Topic<VideoPacket> ros2OutputTopic,
                                    DelayedReferenceFramesBuffer referenceFramesBuffer,
