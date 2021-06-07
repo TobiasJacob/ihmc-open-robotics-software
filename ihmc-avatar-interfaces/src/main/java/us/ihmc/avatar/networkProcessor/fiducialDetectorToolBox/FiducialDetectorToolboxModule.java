@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 import controller_msgs.msg.dds.DetectedFiducialPacket;
+import controller_msgs.msg.dds.VideoPacket;
 import us.ihmc.avatar.drcRobot.RobotTarget;
 import us.ihmc.avatar.networkProcessor.modules.ToolboxController;
 import us.ihmc.avatar.networkProcessor.modules.ToolboxModule;
@@ -13,6 +14,7 @@ import us.ihmc.communication.controllerAPI.command.Command;
 import us.ihmc.euclid.interfaces.Settable;
 import us.ihmc.multicastLogDataProtocol.modelLoaders.LogModelProvider;
 import us.ihmc.pubsub.DomainFactory.PubSubImplementation;
+import us.ihmc.pubsub.subscriber.Subscriber;
 import us.ihmc.robotModels.FullHumanoidRobotModel;
 import us.ihmc.ros2.ROS2Topic;
 import us.ihmc.ros2.RealtimeROS2Node;
@@ -41,14 +43,17 @@ public class FiducialDetectorToolboxModule extends ToolboxModule
    @Override
    public void registerExtraPuSubs(RealtimeROS2Node realtimeROS2Node)
    {
-      ROS2Tools.createCallbackSubscription(realtimeROS2Node, ROS2Tools.VIDEO, videoPacket ->
-      {
-         if (controller != null)
-         {
-            controller.receivedPacket(videoPacket.takeNextData());
-            receivedInput.set(true);
-         }
-      });
+      ROS2Tools.createCallbackSubscription(realtimeROS2Node, ROS2Tools.D435_VIDEO, this::consumeVideoPacket);
+      ROS2Tools.createCallbackSubscription(realtimeROS2Node, ROS2Tools.VIDEO, this::consumeVideoPacket);
+   }
+
+   private void consumeVideoPacket(Subscriber<VideoPacket> videoPacket)
+   {
+      if (controller == null)
+         return;
+
+      controller.receivedPacket(videoPacket.takeNextData());
+      receivedInput.set(true);
    }
 
    @Override
