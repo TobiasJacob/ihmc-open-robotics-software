@@ -7,6 +7,8 @@ import us.ihmc.codecs.yuv.JPEGEncoder;
 import us.ihmc.codecs.yuv.YUVPictureConverter;
 import us.ihmc.communication.IHMCROS2Publisher;
 import us.ihmc.communication.ROS2Tools;
+import us.ihmc.euclid.referenceFrame.ReferenceFrame;
+import us.ihmc.humanoidRobotics.frames.HumanoidReferenceFrames;
 import us.ihmc.log.LogTools;
 import us.ihmc.ros2.ROS2Node;
 import us.ihmc.ros2.ROS2QosProfile;
@@ -15,13 +17,14 @@ import us.ihmc.tools.Timer;
 import us.ihmc.tools.UnitConversions;
 import us.ihmc.tools.thread.MissingThreadTools;
 import us.ihmc.tools.thread.ResettableExceptionHandlingExecutorService;
-import us.ihmc.utilities.ros.RosMainNode;
+import us.ihmc.utilities.ros.RosNodeInterface;
 import us.ihmc.utilities.ros.subscriber.AbstractRosTopicSubscriber;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
+import java.util.function.Function;
 
 public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_msgs.CompressedImage>
 {
@@ -35,9 +38,20 @@ public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_
    private final YUVPictureConverter converter = new YUVPictureConverter();
    private final JPEGEncoder encoder = new JPEGEncoder();
 
-   public RealsenseVideoROS1Bridge(RosMainNode ros1Node, ROS2Node ros2Node, String ros1InputTopic, ROS2Topic<VideoPacket> ros2OutputTopic)
+   private final DelayedReferenceFramesBuffer referenceFramesBuffer;
+   private final Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider;
+
+   private RosNodeInterface ros1Node;
+
+   public RealsenseVideoROS1Bridge(RosNodeInterface ros1Node, ROS2Node ros2Node, String ros1InputTopic, ROS2Topic<VideoPacket> ros2OutputTopic,
+                                   DelayedReferenceFramesBuffer referenceFramesBuffer,
+                                   Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider)
    {
       super(sensor_msgs.CompressedImage._TYPE);
+
+      this.ros1Node = ros1Node;
+      this.sensorFrameProvider = sensorFrameProvider;
+      this.referenceFramesBuffer = referenceFramesBuffer;
 
       String ros1Topic = ros1InputTopic;
       LogTools.info("Subscribing ROS 1: {}", ros1Topic);
@@ -75,6 +89,8 @@ public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_
       {
          byte[] payload = ros1Image.getData().array();
          int offset = ros1Image.getData().arrayOffset();
+         long timestamp = ros1Image.getHeader().getStamp().totalNsecs();
+
          BufferedImage bufferedImage = ImageIO.read(new ByteArrayInputStream(payload, offset, payload.length - offset));
 
          YUVPicture picture = converter.fromBufferedImage(bufferedImage, YUVPicture.YUVSubsamplingType.YUV420);
@@ -83,8 +99,14 @@ public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_
          byte[] data = new byte[buffer.remaining()];
          buffer.get(data);
 
+         referenceFramesBuffer.computeReferenceFrames(timestamp);
+
+         ReferenceFrame sensorFrame = sensorFrameProvider.apply(referenceFramesBuffer.getReferenceFrames());
+
          VideoPacket message = new VideoPacket();
-         message.setTimestamp(System.nanoTime());
+         message.getOrientation().set(sensorFrame.getTransformToWorldFrame().getRotation());
+         message.getPosition().set(sensorFrame.getTransformToWorldFrame().getTranslation());
+         message.setTimestamp(ros1Node.getCurrentTime().totalNsecs());
          message.getData().add(data);
 
          publisher.publish(message);
