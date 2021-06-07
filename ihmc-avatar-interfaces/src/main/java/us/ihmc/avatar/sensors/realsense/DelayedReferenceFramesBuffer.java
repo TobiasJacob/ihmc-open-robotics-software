@@ -7,13 +7,15 @@ import us.ihmc.avatar.ros.RobotROSClockCalculator;
 import us.ihmc.commons.Conversions;
 import us.ihmc.communication.IHMCROS2Callback;
 import us.ihmc.communication.ROS2Tools;
+import us.ihmc.euclid.exceptions.NotARotationMatrixException;
+import us.ihmc.humanoidRobotics.frames.HumanoidReferenceFrames;
 import us.ihmc.log.LogTools;
 import us.ihmc.robotModels.FullHumanoidRobotModel;
 import us.ihmc.ros2.ROS2NodeInterface;
 import us.ihmc.sensorProcessing.communication.producers.RobotConfigurationDataBuffer;
 import us.ihmc.utilities.ros.RosNodeInterface;
 
-public class DelayedRobotConfigurationDataBuffer
+public class DelayedReferenceFramesBuffer
 {
    public static final double INITIAL_DELAY_OFFSET = 0.07;
 
@@ -29,13 +31,16 @@ public class DelayedRobotConfigurationDataBuffer
    private final RobotConfigurationDataBuffer robotConfigurationDataBuffer;
    private final ROS2NodeInterface ros2Node;
    private final DRCRobotModel robotModel;
+   private final HumanoidReferenceFrames referenceFrames;
+   private final FullHumanoidRobotModel fullRobotModel;
 
-   public DelayedRobotConfigurationDataBuffer(ROS2NodeInterface ros2Node, DRCRobotModel robotModel)
+
+   public DelayedReferenceFramesBuffer(ROS2NodeInterface ros2Node, DRCRobotModel robotModel)
    {
       this(ros2Node, robotModel, INITIAL_DELAY_OFFSET);
    }
 
-   public DelayedRobotConfigurationDataBuffer(ROS2NodeInterface ros2Node, DRCRobotModel robotModel, double delayOffset)
+   public DelayedReferenceFramesBuffer(ROS2NodeInterface ros2Node, DRCRobotModel robotModel, double delayOffset)
    {
       this.ros2Node = ros2Node;
       this.robotModel = robotModel;
@@ -43,6 +48,9 @@ public class DelayedRobotConfigurationDataBuffer
       rosClockCalculator = robotModel.getROSClockCalculator();
 
       robotConfigurationDataBuffer = new RobotConfigurationDataBuffer();
+
+      fullRobotModel = robotModel.createFullRobotModel();
+      referenceFrames = new HumanoidReferenceFrames(fullRobotModel, robotModel.getSensorInformation());
    }
 
    private void acceptRobotConfigurationData(RobotConfigurationData robotConfigurationData)
@@ -87,7 +95,7 @@ public class DelayedRobotConfigurationDataBuffer
       rosClockCalculator.unsubscribeFromROS1Topics(ros1Node);
    }
 
-   public long updateFullRobotModel(long timestamp, FullHumanoidRobotModel fullRobotModelToUpdate)
+   public long computeReferenceFrames(long timestamp)
    {
       if (enabled)
       {
@@ -118,9 +126,18 @@ public class DelayedRobotConfigurationDataBuffer
             return selectedTimestamp;
          }
 
-         selectedTimestamp = robotConfigurationDataBuffer.updateFullRobotModel(false, controllerTime, fullRobotModelToUpdate, null);
+         selectedTimestamp = robotConfigurationDataBuffer.updateFullRobotModel(false, controllerTime, fullRobotModel, null);
          if (selectedTimestamp != -1L)
             currentTimestampOffset = rosClockCalculator.getCurrentTimestampOffset();
+
+         try
+         {
+            referenceFrames.updateFrames();
+         }
+         catch (NotARotationMatrixException e)
+         {
+            LogTools.error(e.getMessage());
+         }
       }
       else
       {
@@ -139,5 +156,10 @@ public class DelayedRobotConfigurationDataBuffer
    public long getCurrentTimestampOffset()
    {
       return currentTimestampOffset;
+   }
+
+   public HumanoidReferenceFrames getReferenceFrames()
+   {
+      return referenceFrames;
    }
 }

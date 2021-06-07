@@ -1,14 +1,9 @@
 package us.ihmc.avatar.sensors.realsense;
 
-import controller_msgs.msg.dds.RobotConfigurationData;
 import map_sense.RawGPUPlanarRegionList;
-import org.apache.commons.lang3.mutable.MutableDouble;
-import org.jfree.util.Log;
 import org.ros.message.Time;
 import us.ihmc.avatar.drcRobot.DRCRobotModel;
-import us.ihmc.avatar.ros.RobotROSClockCalculator;
 import us.ihmc.commons.Conversions;
-import us.ihmc.communication.IHMCROS2Callback;
 import us.ihmc.communication.ROS2Tools;
 import us.ihmc.euclid.exceptions.NotARotationMatrixException;
 import us.ihmc.euclid.transform.RigidBodyTransform;
@@ -17,10 +12,8 @@ import us.ihmc.euclid.tuple4D.Quaternion;
 import us.ihmc.humanoidRobotics.frames.HumanoidReferenceFrames;
 import us.ihmc.log.LogTools;
 import us.ihmc.robotEnvironmentAwareness.updaters.GPUPlanarRegionUpdater;
-import us.ihmc.robotModels.FullHumanoidRobotModel;
 import us.ihmc.robotics.geometry.PlanarRegionsList;
 import us.ihmc.ros2.ROS2NodeInterface;
-import us.ihmc.sensorProcessing.communication.producers.RobotConfigurationDataBuffer;
 import us.ihmc.tools.thread.MissingThreadTools;
 import us.ihmc.tools.thread.ResettableExceptionHandlingExecutorService;
 import us.ihmc.utilities.ros.RosNodeInterface;
@@ -35,14 +28,12 @@ public class DelayFixedPlanarRegionsSubscription
 
    private final ResettableExceptionHandlingExecutorService executorService;
    private final GPUPlanarRegionUpdater gpuPlanarRegionUpdater = new GPUPlanarRegionUpdater();
-   private final HumanoidReferenceFrames referenceFrames;
    private final String topic;
    private final Consumer<PlanarRegionsList> callback;
-   private final FullHumanoidRobotModel fullRobotModel;
    private final RosPoseStampedPublisher sensorPosePublisher;
    private boolean posePublisherEnabled = false;
 
-   private final DelayedRobotConfigurationDataBuffer delayedRobotConfigurationDataBuffer;
+   private final DelayedReferenceFramesBuffer referenceFramesBuffer;
    private boolean enabled = false;
    private AbstractRosTopicSubscriber<RawGPUPlanarRegionList> subscriber;
    private double delay = 0.0;
@@ -56,9 +47,9 @@ public class DelayFixedPlanarRegionsSubscription
       this.topic = topic;
       this.callback = callback;
 
-      delayedRobotConfigurationDataBuffer = new DelayedRobotConfigurationDataBuffer(ros2Node, robotModel, INITIAL_DELAY_OFFSET);
+      referenceFramesBuffer = new DelayedReferenceFramesBuffer(ros2Node, robotModel, INITIAL_DELAY_OFFSET);
 
-      ROS2Tools.createCallbackSubscription2(ros2Node, ROS2Tools.MAPSENSE_REGIONS_DELAY_OFFSET, message -> delayedRobotConfigurationDataBuffer.setDelayOffset(message.getData()));
+      ROS2Tools.createCallbackSubscription2(ros2Node, ROS2Tools.MAPSENSE_REGIONS_DELAY_OFFSET, message -> referenceFramesBuffer.setDelayOffset(message.getData()));
 
       boolean daemon = true;
       int queueSize = 1;
@@ -66,11 +57,7 @@ public class DelayFixedPlanarRegionsSubscription
 
       gpuPlanarRegionUpdater.attachROS2Tuner(ros2Node);
 
-      fullRobotModel = robotModel.createFullRobotModel();
-
       sensorPosePublisher = new RosPoseStampedPublisher(false);
-
-      referenceFrames = new HumanoidReferenceFrames(fullRobotModel, robotModel.getSensorInformation());
    }
 
    public void subscribe(RosNodeInterface ros1Node)
@@ -78,14 +65,14 @@ public class DelayFixedPlanarRegionsSubscription
       this.ros1Node = ros1Node;
       LogTools.info("Attaching Publisher for Pose.");
       this.ros1Node.attachPublisher("/atlas/sensors/chest_l515/pose",sensorPosePublisher);
-      delayedRobotConfigurationDataBuffer.subscribe(ros1Node);
+      referenceFramesBuffer.subscribe(ros1Node);
       subscriber = MapsenseTools.createROS1Callback(topic, ros1Node, this::acceptRawGPUPlanarRegionsList);
    }
 
    public void unsubscribe(RosNodeInterface ros1Node)
    {
       ros1Node.removeSubscriber(subscriber);
-      delayedRobotConfigurationDataBuffer.unsubscribe(ros1Node);
+      referenceFramesBuffer.unsubscribe(ros1Node);
    }
 
    private void acceptRawGPUPlanarRegionsList(RawGPUPlanarRegionList rawGPUPlanarRegionList)
@@ -96,22 +83,14 @@ public class DelayFixedPlanarRegionsSubscription
          {
             long timestamp = rawGPUPlanarRegionList.getHeader().getStamp().totalNsecs();
 
-            long selectedTimestamp = delayedRobotConfigurationDataBuffer.updateFullRobotModel(timestamp, fullRobotModel);
+            long selectedTimestamp = referenceFramesBuffer.computeReferenceFrames(timestamp);
             if (selectedTimestamp != -1L)
             {
                long currentTimeInWall = ros1Node.getCurrentTime().totalNsecs();
-               long selectedTimeInWall = selectedTimestamp - delayedRobotConfigurationDataBuffer.getCurrentTimestampOffset();
+               long selectedTimeInWall = selectedTimestamp - referenceFramesBuffer.getCurrentTimestampOffset();
                delay = Conversions.nanosecondsToSeconds(currentTimeInWall - selectedTimeInWall);
 
-               try
-               {
-                  referenceFrames.updateFrames();
-               }
-               catch (NotARotationMatrixException e)
-               {
-                  LogTools.error(e.getMessage());
-               }
-
+               HumanoidReferenceFrames referenceFrames = referenceFramesBuffer.getReferenceFrames();
                PlanarRegionsList planarRegionsList = gpuPlanarRegionUpdater.generatePlanarRegions(rawGPUPlanarRegionList);
                try
                {
@@ -148,7 +127,7 @@ public class DelayFixedPlanarRegionsSubscription
 
    public void setEnabled(boolean enabled)
    {
-      delayedRobotConfigurationDataBuffer.setEnabled(enabled);
+      referenceFramesBuffer.setEnabled(enabled);
 
       if (this.enabled != enabled)
       {
