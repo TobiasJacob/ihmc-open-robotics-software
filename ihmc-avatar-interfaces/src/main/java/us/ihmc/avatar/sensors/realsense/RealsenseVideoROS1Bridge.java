@@ -15,6 +15,7 @@ import us.ihmc.ros2.ROS2QosProfile;
 import us.ihmc.ros2.ROS2Topic;
 import us.ihmc.tools.Timer;
 import us.ihmc.tools.UnitConversions;
+import us.ihmc.tools.thread.ExceptionHandlingThreadPoolExecutor;
 import us.ihmc.tools.thread.MissingThreadTools;
 import us.ihmc.tools.thread.ResettableExceptionHandlingExecutorService;
 import us.ihmc.utilities.ros.RosNodeInterface;
@@ -24,6 +25,8 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_msgs.CompressedImage>
@@ -31,9 +34,12 @@ public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_
    private static final boolean THROTTLE = false;
    private static final double MIN_PUBLISH_PERIOD = UnitConversions.hertzToSeconds(24.0);
 
+   private final AtomicReference<sensor_msgs.CompressedImage> messageToProcess = new AtomicReference<>();
+
+   private final boolean throttle;
    private final IHMCROS2Publisher<VideoPacket> publisher;
    private final Timer throttleTimer = new Timer();
-   private final ResettableExceptionHandlingExecutorService executor = MissingThreadTools.newSingleThreadExecutor(getClass().getSimpleName(), true, 1);
+   private final ResettableExceptionHandlingExecutorService executor;
 
    private final YUVPictureConverter converter = new YUVPictureConverter();
    private final JPEGEncoder encoder = new JPEGEncoder();
@@ -43,15 +49,32 @@ public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_
 
    private final RosNodeInterface ros1Node;
 
-   public RealsenseVideoROS1Bridge(RosNodeInterface ros1Node, ROS2Node ros2Node, String ros1InputTopic, ROS2Topic<VideoPacket> ros2OutputTopic,
+   public RealsenseVideoROS1Bridge(RosNodeInterface ros1Node,
+                                   ROS2Node ros2Node,
+                                   String ros1InputTopic,
+                                   ROS2Topic<VideoPacket> ros2OutputTopic,
+                                   ResettableExceptionHandlingExecutorService executor,
                                    DelayedReferenceFramesBuffer referenceFramesBuffer,
                                    Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider)
+   {
+      this(ros1Node, ros2Node, ros1InputTopic, ros2OutputTopic, executor, referenceFramesBuffer, sensorFrameProvider, THROTTLE);
+   }
+   public RealsenseVideoROS1Bridge(RosNodeInterface ros1Node,
+                                   ROS2Node ros2Node,
+                                   String ros1InputTopic,
+                                   ROS2Topic<VideoPacket> ros2OutputTopic,
+                                   ResettableExceptionHandlingExecutorService executor,
+                                   DelayedReferenceFramesBuffer referenceFramesBuffer,
+                                   Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider,
+                                   boolean throttle)
    {
       super(sensor_msgs.CompressedImage._TYPE);
 
       this.ros1Node = ros1Node;
       this.sensorFrameProvider = sensorFrameProvider;
       this.referenceFramesBuffer = referenceFramesBuffer;
+      this.executor = executor;
+      this.throttle = throttle;
 
       String ros1Topic = ros1InputTopic;
       LogTools.info("Subscribing ROS 1: {}", ros1Topic);
@@ -65,26 +88,34 @@ public class RealsenseVideoROS1Bridge extends AbstractRosTopicSubscriber<sensor_
    @Override
    public void onNewMessage(sensor_msgs.CompressedImage ros1Image)
    {
-      if (THROTTLE)
+      messageToProcess.set(ros1Image);
+      if (throttle)
       {
-         executor.clearQueueAndExecute(() -> waitThenAct(ros1Image));
+         executor.execute(this::waitThenAct);
       }
       else
       {
-         compute(ros1Image);
+         executor.execute(this::compute);
       }
    }
 
-   private void waitThenAct(sensor_msgs.CompressedImage ros1Image)
+   private void waitThenAct()
    {
+      if (messageToProcess.get() == null)
+         return;
+
       throttleTimer.sleepUntilExpiration(MIN_PUBLISH_PERIOD);
       throttleTimer.reset();
 
-      compute(ros1Image);
+      compute();
    }
 
-   private void compute(sensor_msgs.CompressedImage ros1Image)
+   private void compute()
    {
+      sensor_msgs.CompressedImage ros1Image = messageToProcess.getAndSet(null);
+      if (ros1Image == null)
+         return;
+
       try
       {
          byte[] payload = ros1Image.getData().array();

@@ -24,36 +24,55 @@ import us.ihmc.utilities.ros.RosNodeInterface;
 import us.ihmc.utilities.ros.subscriber.AbstractRosTopicSubscriber;
 
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 public class RealsensePointCloudROS1Bridge extends AbstractRosTopicSubscriber<sensor_msgs.PointCloud2>
 {
+   private static final boolean THROTTLE = false;
+
    private static final int MAX_POINTS = 5000;
    private static final double MIN_PUBLISH_PERIOD = UnitConversions.hertzToSeconds(10.0);
 
+   private final boolean throttle;
+
+   private final AtomicReference<sensor_msgs.PointCloud2> messageToProcess = new AtomicReference<>();
    private final IHMCROS2Publisher<StereoVisionPointCloudMessage> publisher;
    private final FramePose3D tempSensorFramePose = new FramePose3D();
    private final Timer throttleTimer = new Timer();
-   private final ResettableExceptionHandlingExecutorService executor = MissingThreadTools.newSingleThreadExecutor(getClass().getSimpleName(), true, 1);
+   private final ResettableExceptionHandlingExecutorService executor;
 
    private final DelayedReferenceFramesBuffer referenceFramesBuffer;
    private final Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider;
 
    private final RosNodeInterface ros1Node;
 
-
    public RealsensePointCloudROS1Bridge(RosMainNode ros1Node,
                                         ROS2Node ros2Node,
                                         String ros1InputTopic,
                                         ROS2Topic<StereoVisionPointCloudMessage> ros2OutputTopic,
+                                        ResettableExceptionHandlingExecutorService executor,
                                         DelayedReferenceFramesBuffer referenceFramesBuffer,
                                         Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider)
+   {
+      this(ros1Node, ros2Node, ros1InputTopic, ros2OutputTopic, executor, referenceFramesBuffer, sensorFrameProvider, THROTTLE);
+   }
+   public RealsensePointCloudROS1Bridge(RosMainNode ros1Node,
+                                        ROS2Node ros2Node,
+                                        String ros1InputTopic,
+                                        ROS2Topic<StereoVisionPointCloudMessage> ros2OutputTopic,
+                                        ResettableExceptionHandlingExecutorService executor,
+                                        DelayedReferenceFramesBuffer referenceFramesBuffer,
+                                        Function<HumanoidReferenceFrames, ReferenceFrame> sensorFrameProvider,
+                                        boolean throttle)
    {
       super(sensor_msgs.PointCloud2._TYPE);
 
       this.ros1Node = ros1Node;
       this.sensorFrameProvider = sensorFrameProvider;
       this.referenceFramesBuffer = referenceFramesBuffer;
+      this.executor = executor;
+      this.throttle = throttle;
 
       LogTools.info("Subscribing ROS 1: {}", ros1InputTopic);
       ros1Node.attachSubscriber(ros1InputTopic, this);
@@ -65,19 +84,34 @@ public class RealsensePointCloudROS1Bridge extends AbstractRosTopicSubscriber<se
    @Override
    public void onNewMessage(sensor_msgs.PointCloud2 ros1PointCloud)
    {
-      executor.clearQueueAndExecute(() -> waitThenAct(ros1PointCloud));
+      messageToProcess.set(ros1PointCloud);
+      if (throttle)
+      {
+         executor.execute(this::waitThenAct);
+      }
+      else
+      {
+         executor.execute(this::compute);
+      }
    }
 
-   private void waitThenAct(sensor_msgs.PointCloud2 ros1PointCloud)
+   private void waitThenAct()
    {
+      if (messageToProcess.get() == null)
+         return;
+
       throttleTimer.sleepUntilExpiration(MIN_PUBLISH_PERIOD);
       throttleTimer.reset();
 
-      compute(ros1PointCloud);
+      compute();
    }
 
-   private void compute(sensor_msgs.PointCloud2 ros1PointCloud)
+   private void compute()
    {
+      sensor_msgs.PointCloud2 ros1PointCloud = messageToProcess.getAndSet(null);
+      if (ros1PointCloud == null)
+         return;
+
       try
       {
          boolean hasColors = true;
