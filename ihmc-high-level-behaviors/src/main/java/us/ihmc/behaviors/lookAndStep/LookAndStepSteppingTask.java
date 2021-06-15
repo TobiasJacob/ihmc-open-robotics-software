@@ -109,40 +109,45 @@ public class LookAndStepSteppingTask
 
    protected void performTask()
    {
-      FootstepPlan shortenedFootstepPlan = new FootstepPlan();
-      PlannedFootstep footstepToTake = footstepPlanEtc.getFootstep(0);
-      shortenedFootstepPlan.addFootstep(footstepToTake);
+      FootstepPlan footstepPlanToSend = new FootstepPlan();
+//      PlannedFootstep footstepToTake = footstepPlanEtc.getFootstep(0);
+//      footstepPlanToSend.addFootstep(footstepToTake);
 
-      swingPlanningModule.computeSwingWaypoints(footstepPlanEtc.getPlanarRegions(),
-                                                shortenedFootstepPlan,
-                                                footstepPlanEtc.getStartFootPoses(),
-                                                footstepPlanEtc.getSwingPlannerType());
+      //      swingPlanningModule.computeSwingWaypoints(footstepPlanEtc.getPlanarRegions(),
+      //                                                footstepPlanToSend,
+      //                                                footstepPlanEtc.getStartFootPoses(),
+      //                                                footstepPlanEtc.getSwingPlannerType());
 
       // TODO: Clean this up.
       // Extract swing time calculation from the proportion swing planner
-      PlannedFootstep endStep = shortenedFootstepPlan.getFootstep(0);
-      Pose3DReadOnly startStep = footstepPlanEtc.getStartFootPoses().get(endStep.getRobotSide());
-      double idealStepLength = footstepPlannerParameters.getIdealFootstepLength();
-      double maxStepZ = footstepPlannerParameters.getMaxStepZ();
-      double maximumStepDistance = EuclidCoreTools.norm(footstepPlannerParameters.getMaximumStepReach(), maxStepZ);
-      double stepDistance = startStep.getPosition().distance(endStep.getFootstepPose().getPosition());
-      double alpha = MathTools.clamp((stepDistance - idealStepLength) / (maximumStepDistance - idealStepLength), 0.0, 1.0);
-      double swingDuration = swingPlannerParameters.getMinimumSwingTime()
-            + alpha * (swingPlannerParameters.getMaximumSwingTime() - swingPlannerParameters.getMinimumSwingTime());
-      if (endStep.getSwingDuration() < swingDuration)
+
+      Pose3DReadOnly stanceFootPose = footstepPlanEtc.getStartFootPoses().get(footstepPlanEtc.getFootstep(0).getRobotSide());
+      for (int i = 0; i < footstepPlanEtc.getNumberOfSteps(); i++)
       {
-         statusLogger.info("Increasing swing duration to {} s", swingDuration);
-         endStep.setSwingDuration(swingDuration);
+         PlannedFootstep footstep = footstepPlanEtc.getFootstep(i);
+         footstepPlanToSend.addFootstep(footstep);
+         double idealStepLength = footstepPlannerParameters.getIdealFootstepLength();
+         double maxStepZ = footstepPlannerParameters.getMaxStepZ();
+         double maximumStepDistance = EuclidCoreTools.norm(footstepPlannerParameters.getMaximumStepReach(), maxStepZ);
+         double stepDistance = stanceFootPose.getPosition().distance(footstep.getFootstepPose().getPosition());
+         double alpha = MathTools.clamp((stepDistance - idealStepLength) / (maximumStepDistance - idealStepLength), 0.0, 1.0);
+         double swingDuration = swingPlannerParameters.getMinimumSwingTime()
+                                + alpha * (swingPlannerParameters.getMaximumSwingTime() - swingPlannerParameters.getMinimumSwingTime());
+         if (footstep.getSwingDuration() < swingDuration)
+         {
+            statusLogger.info("Increasing swing duration to {} s", swingDuration);
+            footstep.setSwingDuration(swingDuration);
+         }
+         stanceFootPose = footstep.getFootstepPose();
       }
-      swingDuration = endStep.getSwingDuration();
 
       lastCommandedFootsteps.put(footstepToTake.getRobotSide(), footstepToTake);
       uiPublisher.publishToUI(LastCommandedFootsteps, MinimalFootstep.reduceFootstepsForUIMessager(lastCommandedFootsteps));
 
       statusLogger.warn("Requesting walk");
       double transferTime = lookAndStepParameters.getTransferTime();
-      FootstepDataListMessage footstepDataListMessage = FootstepDataMessageConverter.createFootstepDataListFromPlan(shortenedFootstepPlan,
-                                                                                                                    swingDuration,
+      FootstepDataListMessage footstepDataListMessage = FootstepDataMessageConverter.createFootstepDataListFromPlan(footstepPlanToSend,
+                                                                                                                    lookAndStepParameters.getSwingTime(),
                                                                                                                     transferTime);
 
       ExecutionMode executionMode = previousStepMessageId == 0L ? ExecutionMode.OVERRIDE : ExecutionMode.QUEUE;
