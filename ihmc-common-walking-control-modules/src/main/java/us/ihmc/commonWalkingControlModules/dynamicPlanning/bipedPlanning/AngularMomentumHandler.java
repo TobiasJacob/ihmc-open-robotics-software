@@ -72,9 +72,7 @@ public class AngularMomentumHandler<T extends ContactStateBasics<T>>
    public void computeAngularMomentum(double time)
    {
       angularMomentumCalculator.computeAngularMomentum(time);
-      FrameVector3DReadOnly desiredAngularMomentumRate = angularMomentumCalculator.useHeightScaledAngularMomentum() ?
-            angularMomentumCalculator.getDesiredHeightScaledAngularMomentumRate() :
-            angularMomentumCalculator.getDesiredAngularMomentumRate();
+      FrameVector3DReadOnly desiredAngularMomentumRate = angularMomentumCalculator.getDesiredAngularMomentumRate();
       ecmpTrajectoryCalculator.computeECMPOffset(desiredAngularMomentumRate, desiredECMPOffset);
    }
 
@@ -96,9 +94,7 @@ public class AngularMomentumHandler<T extends ContactStateBasics<T>>
 
    public List<T> computeECMPTrajectory(List<T> copTrajectories)
    {
-      MultipleSegmentPositionTrajectoryGenerator<FixedFramePolynomialEstimator3D> trajectory = angularMomentumCalculator.useHeightScaledAngularMomentum() ?
-            angularMomentumCalculator.getHeightScaledAngularMomentumTrajectories() :
-            angularMomentumCalculator.getAngularMomentumTrajectories();
+      MultipleSegmentPositionTrajectoryGenerator<FixedFramePolynomialEstimator3D> trajectory = angularMomentumCalculator.getAngularMomentumTrajectories();
 
       return ecmpTrajectoryCalculator.computeECMPTrajectory(copTrajectories, trajectory);
    }
@@ -115,28 +111,13 @@ public class AngularMomentumHandler<T extends ContactStateBasics<T>>
       return angularMomentumCalculator.getAngularMomentumTrajectories();
    }
 
-   public MultipleSegmentPositionTrajectoryGenerator<FixedFramePolynomialEstimator3D> getHeightScaledAngularMomentumTrajectories()
-   {
-      return angularMomentumCalculator.getHeightScaledAngularMomentumTrajectories();
-   }
-
    public FrameVector3DReadOnly getDesiredAngularMomentum()
    {
       return angularMomentumCalculator.getDesiredAngularMomentum();
    }
 
-   public FrameVector3DReadOnly getHeightScaledDesiredAngularMomentum()
-   {
-      return angularMomentumCalculator.getDesiredHeightScaledAngularMomentum();
-   }
-
    public FrameVector3DReadOnly getDesiredAngularMomentumRate()
    {
       return angularMomentumCalculator.getDesiredAngularMomentumRate();
-   }
-
-   public FrameVector3DReadOnly getDesiredHeightScaledAngularMomentumRate()
-   {
-      return angularMomentumCalculator.getDesiredHeightScaledAngularMomentumRate();
    }
 }
