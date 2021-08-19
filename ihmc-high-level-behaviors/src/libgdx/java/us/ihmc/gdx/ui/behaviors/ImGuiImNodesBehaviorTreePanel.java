@@ -37,18 +37,14 @@ import java.util.function.Consumer;
 public class ImGuiImNodesBehaviorTreePanel
 {
    private final String windowName;
-
    private int nodeIndex = 0;
    private int pinIndex = 0;
    private int linkIndex = 0;
    private boolean firstRun = true;
    private final HashMap<Integer, ImGuiMovingPlot> tickPlots = new HashMap<>();
-
    private final HashMap<Integer, ImVec2> nodeSize = new HashMap<>();
    private final HashMap<Integer, Boolean> nodeSizeHasChanged = new HashMap<>();
-
    private final Class<?> parent;
-
    private static final String propertiesDirectory = System.getProperty("user.home") + File.separator + ".ihmc"
                                                      + File.separator + ImGuiImNodesBehaviorTreePanel.class.getSimpleName() + "Settings" + File.separator;
    private boolean hasPrintedWarning = false;
@@ -97,9 +93,12 @@ public class ImGuiImNodesBehaviorTreePanel
       {
          Path treeProperties = Paths.get(propertiesDirectory, "tree" + parent.getSimpleName());
 
-         if (Files.exists(treeProperties)) {
+         if (Files.exists(treeProperties))
+         {
             layoutNodesFromFile(treeProperties);
-         } else {
+         }
+         else
+         {
             if (!applyDefaultNodeLayouts(tree)) //Returns false if no default layout exists
                layoutNodes(tree);
 
@@ -113,10 +112,13 @@ public class ImGuiImNodesBehaviorTreePanel
       firstRun = false;
    }
 
-   private void layoutNodesFromFile(Path file) {
-      JSONFileTools.load(file, jsonNode -> {
+   private void layoutNodesFromFile(Path file)
+   {
+      JSONFileTools.load(file, jsonNode ->
+      {
          Iterator<Map.Entry<String, JsonNode>> it = jsonNode.fields();
-         while (it.hasNext()) {
+         while (it.hasNext())
+         {
             Map.Entry<String, JsonNode> entry = it.next();
 
             int id = Integer.parseInt(entry.getKey());
@@ -129,10 +131,12 @@ public class ImGuiImNodesBehaviorTreePanel
       });
    }
 
-   private void saveLayoutToFile(Path file) {
+   private void saveLayoutToFile(Path file)
+   {
       Consumer<ObjectNode> rootConsumer = root ->
       {
-         for (int node : nodeSize.keySet()) {
+         for (int node : nodeSize.keySet())
+         {
             root.put(Integer.toString(node), ImNodes.getNodeGridSpacePosX(node) + "," + ImNodes.getNodeGridSpacePosY(node));
          }
       };
@@ -205,9 +209,8 @@ public class ImGuiImNodesBehaviorTreePanel
       DefaultTreeForTreeLayout<GDXBehaviorUIInterface> treeForLayout = new DefaultTreeForTreeLayout<>(tree);
       constructAbegoTree(tree, treeForLayout);
 
-      TreeLayout<GDXBehaviorUIInterface> layout = new TreeLayout<GDXBehaviorUIInterface>(treeForLayout, new NodeExtentProvider<GDXBehaviorUIInterface>()
+      TreeLayout<GDXBehaviorUIInterface> layout = new TreeLayout<>(treeForLayout, new NodeExtentProvider<GDXBehaviorUIInterface>()
       {
-
          @Override
          public double getWidth(GDXBehaviorUIInterface gdxBehaviorUIInterface)
          {
@@ -221,7 +224,8 @@ public class ImGuiImNodesBehaviorTreePanel
             int index = getIndexOfNode(gdxBehaviorUIInterface, tree);
             return nodeSize.get(index).y;
          }
-      }, new Configuration<GDXBehaviorUIInterface>()
+      },
+      new Configuration<GDXBehaviorUIInterface>()
       {
          @Override
          public Location getRootLocation()
@@ -399,17 +403,21 @@ public class ImGuiImNodesBehaviorTreePanel
 
          nodeSize.put(nodeIndex, size);
          nodeSizeHasChanged.put(nodeIndex, false);
-      } else {
+      }
+      else
+      {
          ImVec2 size = new ImVec2();
          ImNodes.getNodeDimensions(nodeIndex, size);
          ImVec2 correct = nodeSize.get(nodeIndex);
 
-         if (size.x - correct.x > 0.5f || size.y - correct.y > 0.5f && !nodeSizeHasChanged.get(nodeIndex)) { //query nodeSizeHasChanged to prevent multiple warnings
+         if (size.x - correct.x > 0.5f || size.y - correct.y > 0.5f && !nodeSizeHasChanged.get(nodeIndex))
+         { //query nodeSizeHasChanged to prevent multiple warnings
             nodeSizeHasChanged.put(nodeIndex, true);
             if (!hasPrintedWarning)
             {
                hasPrintedWarning = true;
-               LogTools.warn("Node size has changed for node " + nodeIndex + " (" + nodeName + ") - when implementing renderTreeNode(), ensure the node renders at a fixed size.");
+               LogTools.warn("Node size has changed for node " + nodeIndex + " (" + nodeName
+                             + ") - when implementing renderTreeNode(), ensure the node renders at a fixed size.");
             }
          }
       }
