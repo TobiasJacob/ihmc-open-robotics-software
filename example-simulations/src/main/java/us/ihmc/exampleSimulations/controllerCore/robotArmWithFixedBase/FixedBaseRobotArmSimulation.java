@@ -14,6 +14,14 @@ public class FixedBaseRobotArmSimulation
       YoGraphicsListRegistry yoGraphicsListRegistry = new YoGraphicsListRegistry();
 
       FixedBaseRobotArm robotArm = new FixedBaseRobotArm(controlDT);
+      robotArm.getSCSJointFromIDJoint(robotArm.getShoulderYaw()).setQ(0.2);
+      robotArm.getSCSJointFromIDJoint(robotArm.getShoulderRoll()).setQ(0.2);
+      robotArm.getSCSJointFromIDJoint(robotArm.getShoulderPitch()).setQ(-0.2);
+      robotArm.getSCSJointFromIDJoint(robotArm.getElbowPitch()).setQ(-0.7);
+      robotArm.getSCSJointFromIDJoint(robotArm.getWristPitch()).setQ(0.2);
+      robotArm.getSCSJointFromIDJoint(robotArm.getWristRoll()).setQ(0.2);
+      robotArm.getSCSJointFromIDJoint(robotArm.getWristYaw()).setQ(0.1);
+
       FixedBaseRobotArmController robotArmController = new FixedBaseRobotArmController(robotArm, controlDT, yoGraphicsListRegistry);
       robotArmController.registerControllerCoreModeChangedListener((mode) -> robotArm.setDynamic(mode == WholeBodyControllerCoreMode.INVERSE_DYNAMICS));
       robotArm.setController(robotArmController);
@@ -25,6 +33,8 @@ public class FixedBaseRobotArmSimulation
       scs.setFastSimulate(true, 15);
       scs.addYoGraphicsListRegistry(yoGraphicsListRegistry, true);
       scs.setDT(controlDT, 10);
+      scs.setGroundVisible(false);
+
       scs.startOnAThread();
    }
 

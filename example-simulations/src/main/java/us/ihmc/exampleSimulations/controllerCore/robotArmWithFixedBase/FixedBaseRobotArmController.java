@@ -46,7 +46,9 @@ import us.ihmc.yoVariables.variable.YoEnum;
 
 public class FixedBaseRobotArmController implements RobotController
 {
-   private static final boolean USE_PRIVILEGED_CONFIGURATION = false;
+   private static final WholeBodyControllerCoreMode defaultControlMode = WholeBodyControllerCoreMode.INVERSE_KINEMATICS;
+
+   private static final boolean USE_PRIVILEGED_CONFIGURATION = true;
    private static final ReferenceFrame worldFrame = ReferenceFrame.getWorldFrame();
 
    private final String name = getClass().getSimpleName();
@@ -63,7 +65,8 @@ public class FixedBaseRobotArmController implements RobotController
 
    private final YoEnum<WholeBodyControllerCoreMode> controllerCoreMode = new YoEnum<>("controllerCoreMode", registry,
                                                                                                        WholeBodyControllerCoreMode.class);
-   private final AtomicBoolean controllerCoreModeHasChanged = new AtomicBoolean(false);
+   private final YoEnum<WholeBodyControllerCoreMode> controllerCoreModePrev = new YoEnum<>("controllerCoreModePrev", registry,
+                                                                                       WholeBodyControllerCoreMode.class);
    private final List<ControllerCoreModeChangedListener> controllerModeListeners = new ArrayList<>();
    private final YoEnum<FeedbackControlType> feedbackControlToUse = new YoEnum<>("feedbackControlToUse", registry, FeedbackControlType.class,
                                                                                                  false);
@@ -104,8 +107,8 @@ public class FixedBaseRobotArmController implements RobotController
    {
       this.robotArm = robotArm;
 
-      controllerCoreMode.set(WholeBodyControllerCoreMode.INVERSE_DYNAMICS);
-      controllerCoreMode.addListener(v -> controllerCoreModeHasChanged.set(true));
+      controllerCoreMode.set(defaultControlMode);
+      controllerCoreModePrev.set(controllerCoreMode.getValue());
 
       yoTime = robotArm.getYoTime();
       double gravityZ = robotArm.getGravity();
@@ -143,12 +146,14 @@ public class FixedBaseRobotArmController implements RobotController
 
       privilegedConfigurationCommand.setPrivilegedConfigurationOption(PrivilegedConfigurationOption.AT_ZERO);
       privilegedConfigurationCommand.addJoint(robotArm.getElbowPitch(), Math.PI / 3.0);
+      privilegedConfigurationCommand.setDefaultWeight(0.025);
 
       trajectory = new StraightLinePoseTrajectoryGenerator("handTrajectory", worldFrame, registry, true, yoGraphicsListRegistry);
 
       robotJointLimitWatcher = new RobotJointLimitWatcher(MultiBodySystemTools.filterJoints(controlledJoints, OneDoFJointBasics.class));
       registry.addChild(robotJointLimitWatcher.getYoRegistry());
 
+      robotArm.setDynamic(defaultControlMode != WholeBodyControllerCoreMode.INVERSE_KINEMATICS);
       initialize();
    }
 
@@ -162,13 +167,14 @@ public class FixedBaseRobotArmController implements RobotController
    {
       robotArm.updateIDRobot();
 
+      for (int i = 0; i < privilegedConfigurationCommand.getNumberOfJoints(); i++)
+      {
+         OneDoFJointBasics joint = privilegedConfigurationCommand.getJoint(i);
+         privilegedConfigurationCommand.setOneDoFJoint(i, joint.getQ());
+      }
+
       handWeight.set(1.0);
-
-      handPositionGains.setProportionalGains(100.0);
-      handPositionGains.setDampingRatios(1.0);
-
-      handOrientationGains.setProportionalGains(100.0);
-      handOrientationGains.setDampingRatios(1.0);
+      updateGains();
 
       FramePoint3D initialPosition = new FramePoint3D(robotArm.getHandControlFrame());
       initialPosition.changeFrame(worldFrame);
@@ -192,6 +198,27 @@ public class FixedBaseRobotArmController implements RobotController
       trajectory.showVisualization();
    }
 
+   private void updateGains()
+   {
+      if (controllerCoreMode.getValue() == WholeBodyControllerCoreMode.INVERSE_DYNAMICS || controllerCoreMode.getValue() == WholeBodyControllerCoreMode.VIRTUAL_MODEL)
+      {
+         handPositionGains.setProportionalGains(100.0);
+         handPositionGains.setDampingRatios(1.0);
+         handOrientationGains.setProportionalGains(100.0);
+         handOrientationGains.setDampingRatios(1.0);
+      }
+      else
+      {
+         handPositionGains.setProportionalGains(1200.0);
+         handPositionGains.setDampingRatios(0.0);
+         handPositionGains.setMaxFeedbackAndFeedbackRate(1500.0, Double.POSITIVE_INFINITY);
+
+         handOrientationGains.setProportionalGains(1200.0);
+         handOrientationGains.setDampingRatios(0.0);
+         handOrientationGains.setMaxFeedbackAndFeedbackRate(1500.0, Double.POSITIVE_INFINITY);
+      }
+   }
+
    private final FramePoint3D position = new FramePoint3D();
    private final FrameVector3D linearVelocity = new FrameVector3D();
    private final FrameVector3D linearAcceleration = new FrameVector3D();
@@ -202,6 +229,14 @@ public class FixedBaseRobotArmController implements RobotController
    @Override
    public void doControl()
    {
+      WholeBodyControllerCoreMode controllerCoreMode = this.controllerCoreMode.getValue();
+      WholeBodyControllerCoreMode controllerCoreModePrev = this.controllerCoreModePrev.getValue();
+      if (controllerCoreMode == WholeBodyControllerCoreMode.VIRTUAL_MODEL || controllerCoreMode == WholeBodyControllerCoreMode.OFF)
+      {
+         this.controllerCoreMode.set(WholeBodyControllerCoreMode.INVERSE_DYNAMICS);
+         controllerCoreMode = WholeBodyControllerCoreMode.INVERSE_DYNAMICS;
+      }
+
       robotArm.updateControlFrameAcceleration();
       robotArm.updateIDRobot();
       centerOfMassFrame.update();
@@ -210,6 +245,8 @@ public class FixedBaseRobotArmController implements RobotController
       updateFeedbackCommands();
 
       controllerCoreCommand.clear();
+      controllerCoreCommand.setControllerCoreMode(controllerCoreMode);
+
       if (feedbackControlToUse.getEnumValue() == FeedbackControlType.SPATIAL)
       {
          controllerCoreCommand.addFeedbackControlCommand(handSpatialCommand);
@@ -220,23 +257,21 @@ public class FixedBaseRobotArmController implements RobotController
          controllerCoreCommand.addFeedbackControlCommand(handOrientationCommand);
       }
       if (USE_PRIVILEGED_CONFIGURATION)
-         controllerCoreCommand.addInverseDynamicsCommand(privilegedConfigurationCommand);
+         controllerCoreCommand.addInverseKinematicsCommand(privilegedConfigurationCommand);
       controllerCore.submitControllerCoreCommand(controllerCoreCommand);
       controllerCore.compute();
 
       ControllerCoreOutput controllerCoreOutput = controllerCore.getControllerCoreOutput();
       JointDesiredOutputListReadOnly lowLevelOneDoFJointDesiredDataHolder = controllerCoreOutput.getLowLevelOneDoFJointDesiredDataHolder();
 
-      if (controllerCoreMode.getEnumValue() == WholeBodyControllerCoreMode.OFF
-            || controllerCoreMode.getEnumValue() == WholeBodyControllerCoreMode.VIRTUAL_MODEL)
-         controllerCoreMode.set(WholeBodyControllerCoreMode.INVERSE_DYNAMICS);
+      if (controllerCoreMode != controllerCoreModePrev)
+      {
+         final WholeBodyControllerCoreMode updateMode = controllerCoreMode;
+         controllerModeListeners.forEach(listener -> listener.controllerCoreModeHasChanged(updateMode));
+         updateGains();
+      }
 
-      if (controllerCoreModeHasChanged.getAndSet(false))
-         controllerModeListeners.forEach(listener -> listener.controllerCoreModeHasChanged(controllerCoreMode.getEnumValue()));
-
-      controllerCoreCommand.setControllerCoreMode(controllerCoreMode.getEnumValue());
-
-      if (controllerCoreMode.getEnumValue() == WholeBodyControllerCoreMode.INVERSE_DYNAMICS)
+      if (controllerCoreMode == WholeBodyControllerCoreMode.INVERSE_DYNAMICS)
          robotArm.updateJointTaus(lowLevelOneDoFJointDesiredDataHolder);
       else
          robotArm.updateSCSRobotJointConfiguration(lowLevelOneDoFJointDesiredDataHolder);
@@ -247,6 +282,7 @@ public class FixedBaseRobotArmController implements RobotController
          setRandomConfiguration.set(false);
       }
 
+      this.controllerCoreModePrev.set(controllerCoreMode);
       robotJointLimitWatcher.doControl();
    }
 
@@ -276,7 +312,8 @@ public class FixedBaseRobotArmController implements RobotController
       handSpatialCommand.setPositionGains(handPositionGains);
       handSpatialCommand.setOrientationGains(handOrientationGains);
       handSpatialCommand.setSelectionMatrix(computeSpatialSelectionMatrix());
-      handSpatialCommand.setInverseDynamics(orientation, position, angularVelocity, linearVelocity, angularAcceleration, linearAcceleration);
+//      handSpatialCommand.setInverseDynamics(orientation, position, angularVelocity, linearVelocity, angularAcceleration, linearAcceleration);
+      handSpatialCommand.setInverseKinematics(orientation, position, linearVelocity, angularVelocity);
       handSpatialCommand.setControlMode(controllerCoreMode.getValue());
    }
 
