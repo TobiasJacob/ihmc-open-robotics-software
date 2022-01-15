@@ -58,12 +58,14 @@ public class RemoteControllerStateNetworkingThread extends Thread {
                 double step = this.time;
                 while (true) {
                     String desired = in.readLine();
+                    System.out.println(desired);
                     if (desired != null) {
                         String[] angles = desired.split(",");
                         for (int i = 0; i < angles.length; i++) {
                             String[] parts = angles[i].split("=");
                             desiredAngles.put(parts[0], Double.parseDouble(parts[1]));
                         }
+                        System.out.println(desiredAngles);
                     } else {
                         System.out.println("Command was null");
                         clientSocket.close();

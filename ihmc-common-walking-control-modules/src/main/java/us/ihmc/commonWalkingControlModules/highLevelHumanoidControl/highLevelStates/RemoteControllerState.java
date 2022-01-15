@@ -29,6 +29,7 @@ public class RemoteControllerState extends HighLevelControllerState
    private final LowLevelOneDoFJointDesiredDataHolder lowLevelOneDoFJointDesiredDataHolder;
    private final RemoteControllerStateNetworkingThread networker;
    private final HashMap<String, Double> jointGains;
+   private final HashMap<String, Double> jointDamping;
 
    private YoDouble[] desiredPositions;
    private PDController[] controllers;
@@ -53,44 +54,76 @@ public class RemoteControllerState extends HighLevelControllerState
       this.controllerToolbox = controllerToolbox;
 
       jointGains = new HashMap<String, Double>() {{
-         put("l_leg_aky", 2000.0);
-         put("r_leg_aky", 2000.0);
-         put("l_leg_akx", 100.0);
-         put("r_leg_akx", 100.0);
-         put("l_leg_kny", 1000.0);
-         put("r_leg_kny", 1000.0);
-         put("l_leg_hpz", 100.0);
-         put("r_leg_hpz", 100.0);
-         put("l_leg_hpx", 300.0);
-         put("r_leg_hpx", 300.0);
-         put("l_leg_hpy", 1000.0);
-         put("r_leg_hpy", 1000.0);
-         put("back_bkz", 500.0);
-         put("back_bky", 1500.0);
-         put("back_bkx", 500.0);
-         put("r_arm_shz", 100.0);
-         put("l_arm_shx", 100.0);
-         put("r_arm_shx", 100.0);
-         put("l_arm_ely", 100.0);
-         put("r_arm_ely", 100.0);
-         put("l_arm_elx", 100.0);
-         put("r_arm_elx", 100.0);
-         put("l_arm_wry", 10.0);
-         put("r_arm_wry", 10.0);
-         put("l_arm_wrx", 10.0);
-         put("r_arm_wrx", 10.0);
-         put("l_arm_wry2", 10.0);
-         put("r_arm_wry2", 10.0);
-         put("l_arm_shz", 10.0);
-         put("neck_ry", 10.0);
+         put("l_leg_aky", 400.0);
+         put("r_leg_aky", 400.0);
+         put("l_leg_akx", 400.0);
+         put("r_leg_akx", 400.0);
+         put("l_leg_kny", 500.0);
+         put("r_leg_kny", 500.0);
+         put("l_leg_hpz", 500.0);
+         put("r_leg_hpz", 500.0);
+         put("l_leg_hpx", 500.0);
+         put("r_leg_hpx", 500.0);
+         put("l_leg_hpy", 500.0);
+         put("r_leg_hpy", 500.0);
+         put("back_bkz", 1000.0);
+         put("back_bky", 1000.0);
+         put("back_bkx", 1000.0);
+         put("l_arm_shz", 400.0);
+         put("r_arm_shz", 400.0);
+         put("l_arm_shx", 400.0);
+         put("r_arm_shx", 400.0);
+         put("l_arm_ely", 300.0);
+         put("r_arm_ely", 300.0);
+         put("l_arm_elx", 300.0);
+         put("r_arm_elx", 300.0);
+         put("l_arm_wry", 100.0);
+         put("r_arm_wry", 100.0);
+         put("l_arm_wrx", 100.0);
+         put("r_arm_wrx", 100.0);
+         put("l_arm_wry2", 100.0);
+         put("r_arm_wry2", 100.0);
+         put("neck_ry", 100.0);
+      }};
+      jointDamping = new HashMap<String, Double>() {{
+        put("l_leg_aky", 10.0);
+        put("r_leg_aky", 10.0);
+        put("l_leg_akx", 10.0);
+        put("r_leg_akx", 10.0);
+        put("l_leg_kny", 20.0);
+        put("r_leg_kny", 20.0);
+        put("l_leg_hpz", 40.0);
+        put("r_leg_hpz", 40.0);
+        put("l_leg_hpx", 40.0);
+        put("r_leg_hpx", 40.0);
+        put("l_leg_hpy", 40.0);
+        put("r_leg_hpy", 40.0);
+        put("back_bkz", 70.0);
+        put("back_bky", 70.0);
+        put("back_bkx", 70.0);
+        put("l_arm_shz", 30.0);
+        put("r_arm_shz", 30.0);
+        put("l_arm_shx", 30.0);
+        put("r_arm_shx", 30.0);
+        put("l_arm_ely", 30.0);
+        put("r_arm_ely", 30.0);
+        put("l_arm_elx", 30.0);
+        put("r_arm_elx", 30.0);
+        put("l_arm_wry", 5.0);
+        put("r_arm_wry", 5.0);
+        put("l_arm_wrx", 5.0);
+        put("r_arm_wrx", 5.0);
+        put("l_arm_wry2", 5.0);
+        put("r_arm_wry2", 5.0);
+        put("neck_ry", 10.0);
       }};
 
       for (int i = 0; i < controlledJoints.length; i++) {
          lowLevelOneDoFJointDesiredDataHolder.setJointControlMode(controlledJoints[i], JointDesiredControlMode.EFFORT);
          YoDouble proportionalGain = new YoDouble("proportionalGain" + controlledJoints[i].getName(), getYoRegistry());
          YoDouble derivateGain = new YoDouble("derivateGain" + controlledJoints[i].getName(), getYoRegistry());
-         proportionalGain.set(1.0f);
-         derivateGain.set(0.1 * proportionalGain.getValue());
+         proportionalGain.set(jointGains.get(controlledJoints[i].getName()));
+         derivateGain.set(jointDamping.get(controlledJoints[i].getName()));
          controllers[i] = new PDController(proportionalGain, derivateGain, "pdControllerJoint" + controlledJoints[i].getName(), getYoRegistry());
       }
 
@@ -106,14 +139,7 @@ public class RemoteControllerState extends HighLevelControllerState
          double desiredAngle = networker.getDesiredAngle(controlledJoints[i].getName());
          desiredPositions[i].set(desiredAngle);
          double torque = controllers[i].computeForAngles(controlledJoints[i].getQ(), desiredPositions[i].getDoubleValue(), controlledJoints[i].getQd(), 0);
-         String jointName = lowLevelOneDoFJointDesiredDataHolder.getOneDoFJoint(i).getName();
-         if (torque > 1.0) {
-            torque = 1.0;
-         }
-         if (torque < -1.0) {
-            torque = -1.0;
-         }
-         lowLevelOneDoFJointDesiredDataHolder.setDesiredJointTorque(controlledJoints[i], jointGains.get(jointName) * torque);
+         lowLevelOneDoFJointDesiredDataHolder.setDesiredJointTorque(controlledJoints[i], torque);
 
          networker.setCurrentAngle(controlledJoints[i].getName(), controlledJoints[i].getQ());
          networker.setJointSpeed(controlledJoints[i].getName(), controlledJoints[i].getQd());
