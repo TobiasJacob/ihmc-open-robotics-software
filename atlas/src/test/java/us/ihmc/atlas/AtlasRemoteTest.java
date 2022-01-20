@@ -78,6 +78,7 @@ public class AtlasRemoteTest extends DRCFlatGroundWalkingTest
       drcSimulationTestHelper.setWalkingScriptParameters(getWalkingScriptParameters());
       drcSimulationTestHelper.getSimulationStarter().registerHighLevelControllerState(new RemoteControllerStateFactory());
       drcSimulationTestHelper.getSimulationStarter().setInitialStateEnum(HighLevelControllerName.REMOTE);
+      drcSimulationTestHelper.getSCSInitialSetup().enableGroundSlipping(2.0, 2.0);
       drcSimulationTestHelper.createSimulation(robotModel.getSimpleRobotName() + "Reset");
 
 //      drcSimulationTestHelper.getSimulationStarter().registerHighLevelControllerState(createControllerFactory(HighLevelControllerName.CUSTOM1));
